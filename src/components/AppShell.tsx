@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, LogOut, User, Bell } from 'lucide-react';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { LayoutDashboard, Users, LogOut, User, Bell, Menu, X } from 'lucide-react';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { useAuth } from '../context/AuthContext';
 import { getDatabase } from '../db/database';
@@ -21,9 +21,16 @@ export const AppShell: React.FC = () => {
     const isOnline = useOnlineStatus();
     const { logout, user } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const [unreadCount, setUnreadCount] = useState(0);
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     const { showToast } = useToast();
+
+    // Close mobile menu on navigation
+    useEffect(() => {
+        setMobileMenuOpen(false);
+    }, [location]);
 
     useEffect(() => {
         if (!user) return;
@@ -73,17 +80,31 @@ export const AppShell: React.FC = () => {
     };
 
     return (
-        <div className="flex h-screen bg-background text-foreground animate-in fade-in duration-500">
+        <div className="flex h-screen bg-background text-foreground animate-in fade-in duration-500 overflow-hidden">
+            {/* Mobile Sidebar Overlay */}
+            {mobileMenuOpen && (
+                <div
+                    className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm md:hidden"
+                    onClick={() => setMobileMenuOpen(false)}
+                />
+            )}
+
             {/* Sidebar */}
-            <aside className="w-64 border-r border-border bg-card/50 flex flex-col">
-                <div className="p-4 border-b border-border/40">
+            <aside className={cn(
+                "fixed inset-y-0 left-0 z-50 w-64 border-r border-border bg-card/95 backdrop-blur flex flex-col transition-transform duration-300 ease-in-out md:static md:translate-x-0",
+                mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+            )}>
+                <div className="p-4 border-b border-border/40 flex items-center justify-between">
                     <div className="flex items-center gap-2 font-semibold text-lg tracking-tight">
                         <div className="w-5 h-5 rounded-md bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold">T</div>
                         TeamOps
                     </div>
+                    <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setMobileMenuOpen(false)}>
+                        <X className="h-5 w-5" />
+                    </Button>
                 </div>
 
-                <nav className="flex-1 p-2 space-y-1">
+                <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
                     <NavItem to="/app" end icon={<LayoutDashboard size={18} />} label="Dashboard" />
                     <NavItem to="/app/teams" icon={<Users size={18} />} label="Teams" />
                     <NavItem
@@ -94,7 +115,7 @@ export const AppShell: React.FC = () => {
                     />
                 </nav>
 
-                <div className="p-4 border-t border-border/40 space-y-4">
+                <div className="p-4 border-t border-border/40 space-y-4 bg-card/50">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className="w-full justify-start px-2 hover:bg-muted">
@@ -138,12 +159,25 @@ export const AppShell: React.FC = () => {
                 </div>
             </aside>
 
-            {/* Main Content */}
-            <main className="flex-1 overflow-y-auto">
-                <div className="max-w-5xl mx-auto p-8">
-                    <Outlet />
-                </div>
-            </main>
+            {/* Main Content Area */}
+            <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+                {/* Mobile Header Trigger */}
+                <header className="md:hidden border-b p-4 flex items-center justify-between bg-card/50 backdrop-blur sticky top-0 z-30 h-16">
+                    <div className="flex items-center gap-2 font-semibold">
+                        <div className="w-5 h-5 rounded-md bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold">T</div>
+                        TeamOps
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(true)}>
+                        <Menu className="h-5 w-5" />
+                    </Button>
+                </header>
+
+                <main className="flex-1 overflow-y-auto w-full">
+                    <div className="max-w-5xl mx-auto p-4 md:p-8 space-y-6">
+                        <Outlet />
+                    </div>
+                </main>
+            </div>
 
             <SyncStatus />
         </div>
