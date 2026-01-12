@@ -22,9 +22,21 @@ export const SyncStatus: React.FC = () => {
         };
 
         const handleSyncError = (e: any) => {
+            const errMsg = e.detail?.error?.message || '';
+            const errName = e.detail?.error?.name || '';
+
+            // Ignore offline/network errors
+            if (errMsg.includes('Failed to fetch') ||
+                errMsg.includes('NetworkError') ||
+                errName === 'TypeError' ||
+                !navigator.onLine) {
+                console.debug('Supressed offline sync error in UI');
+                return;
+            }
+
             console.error("Sync Error caught in UI:", e.detail);
             setSyncState('error');
-            setLastError(e.detail?.error?.message || 'Unknown sync error');
+            setLastError(errMsg || 'Unknown sync error');
         };
 
         window.addEventListener('sync-active', handleSyncActive);
@@ -109,8 +121,17 @@ export const SyncStatus: React.FC = () => {
                 </div>
             ) : (
                 <div className="flex items-center gap-1.5 text-muted-foreground">
-                    <div className="w-2 h-2 rounded-full bg-green-500/50" />
-                    <span>Synced</span>
+                    {!isOnline ? (
+                        <>
+                            <RefreshCw className="w-3.5 h-3.5" />
+                            <span>Pending</span>
+                        </>
+                    ) : (
+                        <>
+                            <div className="w-2 h-2 rounded-full bg-green-500/50" />
+                            <span>Synced</span>
+                        </>
+                    )}
                 </div>
             )}
         </div>

@@ -4,7 +4,10 @@
 <head>
   <meta charset="UTF-8" />
   <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#ffffff" />
+  <meta name="description" content="Offline-capable team management application" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <title>TeamOps</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,13 +15,19 @@
 </head>
 
 <body>
-  <div id="global-error" style="color: red; padding: 20px; font-family: monospace; white-space: pre-wrap;"></div>
   <script>
+    // Suppress offline errors from appearing as critical errors
     window.onerror = function (msg, url, line, col, error) {
-      document.getElementById('global-error').innerText += `Global Error: ${msg}\n${error?.stack || ''}\n`;
+      if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) return;
+      console.error('Global Error:', msg, error);
     };
     window.onunhandledrejection = function (e) {
-      document.getElementById('global-error').innerText += `Unhandled Rejection: ${e.reason}\n`;
+      // Ignore network errors (common in offline PWA)
+      if (e.reason?.message?.includes('Failed to fetch') || e.reason?.message?.includes('NetworkError')) {
+        e.preventDefault();
+        return;
+      }
+      console.error('Unhandled Rejection:', e.reason);
     };
   </script>
   <div id="root"></div>

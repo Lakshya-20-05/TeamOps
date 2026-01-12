@@ -1,17 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from '@radix-ui/react-label';
 import { useAuth } from '../context/AuthContext';
-import { Loader2, Wifi, Zap, Shield, ArrowRight, Layout } from 'lucide-react';
+import { Loader2, Wifi, Zap, Shield, ArrowRight, Layout, Download } from 'lucide-react';
 
 export const LandingPage: React.FC = () => {
     const navigate = useNavigate();
     const { login, signup, user, isLoading: isAuthLoading } = useAuth();
     const [isLogin, setIsLogin] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
+    const [installPrompt, setInstallPrompt] = useState<any>(null);
+
+    useEffect(() => {
+        const handler = (e: any) => {
+            e.preventDefault();
+            setInstallPrompt(e);
+        };
+        window.addEventListener('beforeinstallprompt', handler);
+        return () => window.removeEventListener('beforeinstallprompt', handler);
+    }, []);
+
+    const handleInstallClick = async () => {
+        if (!installPrompt) return;
+        installPrompt.prompt();
+        const { outcome } = await installPrompt.userChoice;
+        if (outcome === 'accepted') {
+            setInstallPrompt(null);
+        }
+    };
 
     // Form States
     const [email, setEmail] = useState('');
@@ -91,6 +110,15 @@ export const LandingPage: React.FC = () => {
                     <span>TeamOps</span>
                 </div>
                 <div className="flex items-center gap-4">
+                    {installPrompt && (
+                        <Button
+                            onClick={handleInstallClick}
+                            variant="outline"
+                            className="bg-primary/20 text-primary border-primary/20 hover:bg-primary/30"
+                        >
+                            <Download className="mr-2 w-4 h-4" /> Install App
+                        </Button>
+                    )}
                     {user && (
                         <Button
                             onClick={() => navigate('/app')}

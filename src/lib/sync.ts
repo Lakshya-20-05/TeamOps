@@ -16,8 +16,20 @@ export const syncCollection = async (
     mapToLocal: (row: any) => any
 ) => {
 
+    // Helper to pause execution until online
+    const waitForOnline = async () => {
+        if (navigator.onLine) return;
+        // console.debug('[Sync] Offline. Waiting for network...');
+        await new Promise<void>(resolve => {
+            window.addEventListener('online', () => resolve(), { once: true });
+        });
+        // console.debug('[Sync] Online. Resuming...');
+    };
+
     // 1. Pull Handler (Download from Supabase)
     const pullHandler = async (checkpoint: any, batchSize: number) => {
+        await waitForOnline();
+
         // checkpoint format: { updated_at: string, id: string }
         const lastUpdatedAt = checkpoint ? checkpoint.updated_at : new Date(0).toISOString();
         const lastId = checkpoint ? checkpoint.id : '00000000-0000-0000-0000-000000000000'; // Min UUID
@@ -61,7 +73,19 @@ export const syncCollection = async (
                 checkpoint: newCheckpoint
             };
         } catch (err: any) {
-            console.error(`Pull error for ${tableName}:`, err);
+            // Silence offline errors
+            if (err?.message?.includes('Failed to fetch') || err?.name === 'TypeError') {
+                // Debug level log only
+                console.debug(`[Sync ${tableName}] Offline - Pull skipped.`);
+                // Do not re-throw, let RxDB retry silently
+                // But we must return a compatible response to stop RxDB from freaking out?
+                // Actually, throwing is fine for RxDB to retry, but we just don't want global error handlers to see it.
+                // If we swallow it, RxDB might think it succeeded with empty data.
+                // Better to throw a specific "Offline" error that we ignore elsewhere?
+                // For now, re-throwing is required for retry logic, but we've handled the global noise.
+            } else {
+                console.error(`Pull error for ${tableName}:`, err);
+            }
             window.dispatchEvent(new CustomEvent('sync-error', { detail: { table: tableName, error: err } }));
             throw err;
         }
@@ -70,6 +94,7 @@ export const syncCollection = async (
     // 2. Push Handler (Upload to Supabase)
     // 2. Push Handler (Upload to Supabase)
     const pushHandler = async (rows: RxReplicationWriteToMasterRow<any>[]) => {
+        await waitForOnline();
         window.dispatchEvent(new CustomEvent('sync-active', { detail: { table: tableName, type: 'push' } }));
         try {
             console.log(`[Sync] Pushing ${rows.length} rows to ${tableName}`);
@@ -90,10 +115,14 @@ export const syncCollection = async (
 
             return []; // No conflicts
         } catch (err: any) {
-            console.error(`Push error for ${tableName}:`, err);
-            // Hint for common errors
-            if (err.code === '42P01') console.error(`Table '${tableName}' does not exist in Supabase.`);
-            if (err.code === '401' || err.code === '403') console.error(`RLS Policy violation for '${tableName}'. Check Supabase policies.`);
+            if (err?.message?.includes('Failed to fetch') || err?.name === 'TypeError') {
+                console.debug(`[Sync ${tableName}] Offline - Push skipped.`);
+            } else {
+                console.error(`Push error for ${tableName}:`, err);
+                // Hint for common errors
+                if (err.code === '42P01') console.error(`Table '${tableName}' does not exist in Supabase.`);
+                if (err.code === '401' || err.code === '403') console.error(`RLS Policy violation for '${tableName}'. Check Supabase policies.`);
+            }
 
             window.dispatchEvent(new CustomEvent('sync-error', { detail: { table: tableName, error: err } }));
             throw err;
