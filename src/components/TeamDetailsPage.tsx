@@ -8,12 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from '@radix-ui/react-label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
-
-// I'll stick to native select for speed unless I install select. I'll check my plan.
-// I installed radix-ui/react-select earlier? No I skipped it in session 1.
-// I'll use native select for assignee to be safe and fast.
-
-import { Calendar as CalendarIcon, Loader2, Plus, CheckCircle2, Clock, AlertCircle, Trash2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Copy, Check, UserPlus, Calendar as CalendarIcon, Loader2, Plus, CheckCircle2, Clock, AlertCircle, Trash2 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar } from './ui/calendar';
 import { v4 as uuidv4 } from 'uuid';
@@ -39,6 +35,45 @@ export const TeamDetailsPage: React.FC = () => {
     const [newTaskPriority, setNewTaskPriority] = useState<'low' | 'medium' | 'high'>('medium');
     const [newTaskAssignee, setNewTaskAssignee] = useState('');
 
+    // Add Member Dialog Logic
+    const [addMemberOpen, setAddMemberOpen] = useState(false);
+    const [inviteUsername, setInviteUsername] = useState('');
+    const [inviteStatus, setInviteStatus] = useState('');
+    const [copied, setCopied] = useState(false);
+
+    const handleAddMember = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!team || !inviteUsername.trim() || !user) return;
+
+        try {
+            const targetUser = await db.users.findOne({ selector: { username: inviteUsername } }).exec();
+            if (!targetUser) { setInviteStatus('User not found'); return; }
+            if (team.members.some(m => m.userId === targetUser.id)) { setInviteStatus('User is already a member'); return; }
+            const existingInvite = await db.invitations.findOne({ selector: { teamId: team.id, receiverId: targetUser.id, status: 'pending' } }).exec();
+            if (existingInvite) { setInviteStatus('Invitation already pending'); return; }
+
+            await db.invitations.insert({
+                id: uuidv4(),
+                teamId: team.id,
+                senderId: user.id,
+                receiverId: targetUser.id,
+                status: 'pending',
+                createdAt: new Date().toISOString()
+            });
+
+            setInviteStatus('Invitation sent successfully!');
+            setTimeout(() => { setAddMemberOpen(false); setInviteUsername(''); setInviteStatus(''); }, 1000);
+        } catch (err) { console.error(err); setInviteStatus('Failed to send invitation'); }
+    };
+
+    const copyInviteLink = () => {
+        if (!team) return;
+        const link = `${window.location.origin}/join/${team.id}`;
+        navigator.clipboard.writeText(link);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
     useEffect(() => {
         if (!teamId || !user) return;
 
@@ -51,7 +86,6 @@ export const TeamDetailsPage: React.FC = () => {
             setTeam(teamData);
 
             // Resolve member names
-            // In a real app we'd do a bulk query. Here we iterate.
             const resolvedMembers = await Promise.all(teamData.members.map(async (m) => {
                 const u = await db.users.findOne(m.userId).exec();
                 return {
@@ -76,8 +110,6 @@ export const TeamDetailsPage: React.FC = () => {
                     const pA = priorityMap[a.priority || 'medium'] || 2;
                     const pB = priorityMap[b.priority || 'medium'] || 2;
                     if (pA !== pB) return pB - pA; // Higher priority first
-
-                    // Secondary sort: Created Date (Newest first)
                     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
                 });
             setTasks(sortedTasks);
@@ -103,12 +135,11 @@ export const TeamDetailsPage: React.FC = () => {
             priority: newTaskPriority,
             deadline: newTaskDeadline || undefined,
             teamId: teamId,
-            assigneeId: newTaskAssignee || user.id, // Default to self if not picked
+            assigneeId: newTaskAssignee || user.id,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
         });
 
-        // Notify Assignee
         if (newTaskAssignee) {
             await db.notifications.insert({
                 id: uuidv4(),
@@ -127,7 +158,6 @@ export const TeamDetailsPage: React.FC = () => {
         }
 
         setAssignOpen(false);
-        // Reset form
         setNewTaskTitle('');
         setNewTaskDesc('');
         setNewTaskDeadline('');
@@ -144,7 +174,6 @@ export const TeamDetailsPage: React.FC = () => {
                 }
             });
 
-            // Notify Admins
             const admins = members.filter(m => m.role === 'admin' && m.id !== user?.id);
             await Promise.all(admins.map(admin =>
                 db.notifications.insert({
@@ -178,7 +207,6 @@ export const TeamDetailsPage: React.FC = () => {
         return { label: 'In Progress', color: 'text-blue-500', icon: <Clock size={14} /> };
     };
 
-    // Confirmation States
     const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
     const [memberToRemove, setMemberToRemove] = useState<string | null>(null);
 
@@ -214,7 +242,6 @@ export const TeamDetailsPage: React.FC = () => {
 
     return (
         <div className="space-y-8">
-            {/* Header & Assign Dialog (Keep existing) */}
             <div className="flex items-center justify-between">
                 <div>
                     <h2 className="text-3xl font-bold tracking-tight">{team.name}</h2>
@@ -313,7 +340,6 @@ export const TeamDetailsPage: React.FC = () => {
                 )}
             </div>
 
-            {/* Confirmation Dialogs */}
             <Dialog open={!!memberToRemove} onOpenChange={(open) => !open && setMemberToRemove(null)}>
                 <DialogContent>
                     <DialogHeader>
@@ -344,12 +370,53 @@ export const TeamDetailsPage: React.FC = () => {
                 </DialogContent>
             </Dialog>
 
+            {/* Add Member Dialog */}
+            <Dialog open={addMemberOpen} onOpenChange={setAddMemberOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>Add Members</DialogTitle>
+                        <DialogDescription>Invite others to join <strong>{team.name}</strong>.</DialogDescription>
+                    </DialogHeader>
+                    <Tabs defaultValue="username" className="w-full">
+                        <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="username">By Username</TabsTrigger>
+                            <TabsTrigger value="link">Invite Link</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="username">
+                            <form onSubmit={handleAddMember} className="space-y-4 py-4">
+                                <div className="space-y-2">
+                                    <Label>Username</Label>
+                                    <Input placeholder="Enter username" value={inviteUsername} onChange={(e) => { setInviteUsername(e.target.value); setInviteStatus(''); }} />
+                                    {inviteStatus && <p className={cn("text-sm", inviteStatus.includes("success") ? "text-emerald-500" : "text-destructive")}>{inviteStatus}</p>}
+                                </div>
+                                <Button type="submit" className="w-full">Add Member</Button>
+                            </form>
+                        </TabsContent>
+                        <TabsContent value="link" className="py-4 space-y-4">
+                            <div className="space-y-2">
+                                <Label>Team Invite Link</Label>
+                                <div className="flex items-center space-x-2">
+                                    <Input readOnly value={team ? `${window.location.origin}/join/${team.id}` : ''} />
+                                    <Button size="icon" variant="outline" onClick={copyInviteLink}>
+                                        {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                    </Button>
+                                </div>
+                            </div>
+                        </TabsContent>
+                    </Tabs>
+                </DialogContent>
+            </Dialog>
+
             <div className="grid gap-6 md:grid-cols-3">
-                {/* Members List */}
                 <div className="md:col-span-1 space-y-4">
                     <Card>
-                        <CardHeader>
+                        <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                             <CardTitle className="text-lg">Members ({members.length})</CardTitle>
+                            {isAdmin && (
+                                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setAddMemberOpen(true)}>
+                                    <UserPlus className="h-4 w-4" />
+                                </Button>
+                            )}
                         </CardHeader>
                         <CardContent className="space-y-2">
                             {members.map(m => (
@@ -380,11 +447,9 @@ export const TeamDetailsPage: React.FC = () => {
                     </Card>
                 </div>
 
-                {/* Tasks List */}
                 <div className="md:col-span-2 space-y-4">
                     <h3 className="text-xl font-bold">Tasks</h3>
                     <div className="grid gap-3">
-                        {/* ... (Keep existing empty state check) */}
                         {tasks.length === 0 && (
                             <div className="text-center p-8 text-muted-foreground border-2 border-dashed rounded-lg">
                                 No tasks assigned in this team yet.
@@ -397,7 +462,6 @@ export const TeamDetailsPage: React.FC = () => {
 
                             return (
                                 <div key={task.id} className="group flex items-start justify-between p-4 rounded-lg border bg-card hover:bg-accent/5 transition-colors">
-                                    {/* ... (Keep existing task content) */}
                                     <div className="space-y-1">
                                         <div className="flex items-center gap-2">
                                             <h4 className={cn("font-medium", task.status === 'done' && "line-through text-muted-foreground")}>{task.title}</h4>

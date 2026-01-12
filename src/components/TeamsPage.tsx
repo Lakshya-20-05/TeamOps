@@ -3,17 +3,23 @@ import React, { useEffect, useState } from 'react';
 import { useDatabase } from '../hooks/useDatabase';
 import { useAuth } from '../context/AuthContext';
 import type { Team } from '../db/schemas';
-import { Plus, User as UserIcon, Shield, Crown } from 'lucide-react';
+import { Plus, User as UserIcon, Shield, Crown, Copy, Check, UserPlus, MoreVertical, Trash2, LogOut } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from './ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { cn } from '../lib/utils';
-
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Copy, Check, UserPlus } from 'lucide-react';
 import { Label } from '@radix-ui/react-label';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "./ui/DropdownMenu";
 
 import { useNavigate } from 'react-router-dom';
 
@@ -33,6 +39,10 @@ export const TeamsPage: React.FC = () => {
     const [inviteUsername, setInviteUsername] = useState('');
     const [inviteStatus, setInviteStatus] = useState('');
     const [copied, setCopied] = useState(false);
+
+    // Dialog States for Actions
+    const [teamToDelete, setTeamToDelete] = useState<Team | null>(null);
+    const [teamToLeave, setTeamToLeave] = useState<Team | null>(null);
 
     useEffect(() => {
         if (!user || !db) return;
@@ -134,6 +144,42 @@ export const TeamsPage: React.FC = () => {
         setTimeout(() => setCopied(false), 2000);
     };
 
+    const handleDeleteTeam = async () => {
+        if (!teamToDelete) return;
+        try {
+            const doc = await db.teams.findOne(teamToDelete.id).exec();
+            if (doc) {
+                await doc.remove();
+            }
+        } catch (error) {
+            console.error("Error deleting team:", error);
+        } finally {
+            setTeamToDelete(null);
+        }
+    };
+
+    const handleLeaveTeam = async () => {
+        if (!teamToLeave || !user) return;
+        try {
+            const doc = await db.teams.findOne(teamToLeave.id).exec();
+            if (doc) {
+                const teamData = doc.toJSON() as Team;
+                const updatedMembers = teamData.members.filter(m => m.userId !== user.id);
+                // Prevent leaving if it would leave the team empty or admin-less (optional safeguard, but simple for now)
+                await doc.update({
+                    $set: {
+                        members: updatedMembers,
+                        updatedAt: new Date().toISOString()
+                    }
+                });
+            }
+        } catch (error) {
+            console.error("Error leaving team:", error);
+        } finally {
+            setTeamToLeave(null);
+        }
+    };
+
     return (
         <div className="space-y-8">
             <div className="flex items-center justify-between">
@@ -230,6 +276,38 @@ export const TeamsPage: React.FC = () => {
                 </Dialog>
             </div>
 
+            {/* Delete Team Confirmation */}
+            <Dialog open={!!teamToDelete} onOpenChange={(open) => !open && setTeamToDelete(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Delete Team</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to delete <strong>{teamToDelete?.name}</strong>? This action cannot be undone and will remove all data associated with this team.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setTeamToDelete(null)}>Cancel</Button>
+                        <Button variant="destructive" onClick={handleDeleteTeam}>Delete Team</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Leave Team Confirmation */}
+            <Dialog open={!!teamToLeave} onOpenChange={(open) => !open && setTeamToLeave(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Leave Team</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to leave <strong>{teamToLeave?.name}</strong>? You will lose access to this team's content.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setTeamToLeave(null)}>Cancel</Button>
+                        <Button variant="destructive" onClick={handleLeaveTeam}>Leave Team</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {teams.map((team) => (
                     <Card
@@ -249,23 +327,45 @@ export const TeamsPage: React.FC = () => {
                                     )}
                                 </CardTitle>
                             </div>
-                            {/* Only show Add button if user is admin */}
-                            {team.members.some(m => m.userId === user?.id && m.role === 'admin') && (
-                                <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="opacity-0 group-hover:opacity-100 transition-opacity"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSelectedTeam(team);
-                                        setAddMemberOpen(true);
-                                        setInviteStatus('');
-                                        setInviteUsername('');
-                                    }}
-                                >
-                                    <UserPlus className="h-4 w-4" />
-                                </Button>
-                            )}
+
+                            {/* Actions Menu */}
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
+                                        <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuLabel>Options</DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+                                    {team.members.some(m => m.userId === user?.id && m.role === 'admin') ? (
+                                        <>
+                                            <DropdownMenuItem onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedTeam(team);
+                                                setAddMemberOpen(true);
+                                                setInviteStatus('');
+                                                setInviteUsername('');
+                                            }}>
+                                                <UserPlus className="mr-2 h-4 w-4" /> Add Member
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={(e) => {
+                                                e.stopPropagation();
+                                                setTeamToDelete(team);
+                                            }}>
+                                                <Trash2 className="mr-2 h-4 w-4" /> Delete Team
+                                            </DropdownMenuItem>
+                                        </>
+                                    ) : (
+                                        <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={(e) => {
+                                            e.stopPropagation();
+                                            setTeamToLeave(team);
+                                        }}>
+                                            <LogOut className="mr-2 h-4 w-4" /> Leave Team
+                                        </DropdownMenuItem>
+                                    )}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         </CardHeader>
                         <CardContent className="flex-1">
                             <CardDescription className="line-clamp-2">
