@@ -20,6 +20,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
+        if (!db) return; // Wait for DB to be initialized
+
         // Check active session
         supabase.auth.getSession().then(({ data: { session } }) => {
             if (session?.user) {
@@ -43,7 +45,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, [db]);
 
     const syncUser = async (authUser: any) => {
-        if (!db) return;
+        // db is guaranteed by useEffect dependency
+        if (!db) {
+            console.error("DB not ready during user sync");
+            setIsLoading(false);
+            return;
+        }
 
         // Map Supabase user to our local schema
         const localUser: User = {

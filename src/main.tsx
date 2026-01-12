@@ -1,5 +1,14 @@
 import './polyfills';
 import React from 'react';
+
+// Global Chunk Load Error Handler
+window.addEventListener('error', (e) => {
+  if (/Loading chunk [\d]+ failed/.test(e.message)) {
+    console.error('Chunk loading failed, reloading...', e);
+    window.location.reload();
+  }
+});
+
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
