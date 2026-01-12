@@ -91,7 +91,7 @@ export const AppShell: React.FC = () => {
 
             {/* Sidebar */}
             <aside className={cn(
-                "fixed inset-y-0 left-0 z-50 w-64 border-r border-border bg-card/95 backdrop-blur flex flex-col transition-transform duration-300 ease-in-out md:static md:translate-x-0",
+                "fixed inset-y-0 left-0 z-50 w-full md:w-64 border-r border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex flex-col transition-transform duration-300 ease-in-out md:static md:translate-x-0",
                 mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
             )}>
                 <div className="p-4 border-b border-border/40 flex items-center justify-between">
