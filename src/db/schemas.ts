@@ -74,7 +74,7 @@ export interface Notification {
 /* --- Schemas --- */
 
 export const userSchema: RxJsonSchema<User> = {
-    version: 1, // Bumped
+    version: 2, // Bumped for email index
     primaryKey: 'id',
     type: 'object',
     properties: {
@@ -86,7 +86,8 @@ export const userSchema: RxJsonSchema<User> = {
             type: 'string'
         },
         email: {
-            type: 'string'
+            type: 'string',
+            maxLength: 100
         },
         name: {
             type: 'string'
@@ -101,7 +102,8 @@ export const userSchema: RxJsonSchema<User> = {
             type: 'string'
         }
     },
-    required: ['id', 'username', 'email', 'password', 'createdAt']
+    required: ['id', 'username', 'email', 'password', 'createdAt'],
+    indexes: ['email'] // Critical for offline login lookup
 };
 
 export const teamSchema: RxJsonSchema<Team> = {

@@ -72,6 +72,10 @@ const _create = async (): Promise<MyDatabase> => {
                         oldDoc.password = 'password123'; // Default reset password
                         oldDoc.phoneNumber = '';
                         return oldDoc;
+                    },
+                    2: function (oldDoc: any) {
+                        // User migration v2: added email index / maxLength
+                        return oldDoc;
                     }
                 }
             },
