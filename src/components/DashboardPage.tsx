@@ -4,8 +4,11 @@ import { useDatabase } from '../hooks/useDatabase';
 import { useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 
+import { useNavigate } from 'react-router-dom';
+
 export const DashboardPage: React.FC = () => {
     const db = useDatabase();
+    const navigate = useNavigate();
     const [stats, setStats] = useState({ teams: 0, tasks: 0, done: 0 });
 
     const { user } = useAuth();
@@ -14,7 +17,7 @@ export const DashboardPage: React.FC = () => {
         if (!user) return;
 
         const sub1 = db.teams.find().$.subscribe(teams => {
-            const myTeams = teams.map(t => t.toJSON() as any).filter(t => t.members.some((m: any) => m.userId === user.id));
+            const myTeams = teams.filter(t => t.members.some((m: any) => m.userId === user.id));
             setStats(s => ({ ...s, teams: myTeams.length }));
         });
 
@@ -23,11 +26,10 @@ export const DashboardPage: React.FC = () => {
             // to match TasksPage logic:
             db.teams.find().exec().then(allTeams => {
                 const myTeamIds = allTeams
-                    .map(t => t.toJSON() as any)
                     .filter(t => t.members.some((m: any) => m.userId === user.id))
                     .map(t => t.id);
 
-                const myTasks = tasks.map(t => t.toJSON() as any).filter(t =>
+                const myTasks = tasks.filter(t =>
                     t.assigneeId === user.id || (t.teamId && myTeamIds.includes(t.teamId))
                 );
 
@@ -50,7 +52,10 @@ export const DashboardPage: React.FC = () => {
             </div>
 
             <div className="grid gap-4 md:grid-cols-3">
-                <Card>
+                <Card
+                    className="cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => navigate('/app/teams')}
+                >
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Total Teams</CardTitle>
                     </CardHeader>

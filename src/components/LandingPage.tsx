@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from '@radix-ui/react-label';
 import { useAuth } from '../context/AuthContext';
-import { Loader2, Wifi, Zap, Shield, ArrowRight, Layout, Download } from 'lucide-react';
+import { Loader2, Zap, Shield, ArrowRight, Layout, Download, Wifi } from 'lucide-react';
 
 export const LandingPage: React.FC = () => {
     const navigate = useNavigate();
@@ -134,7 +134,6 @@ export const LandingPage: React.FC = () => {
                 <div className="container mx-auto px-6 py-12 lg:py-20 grid lg:grid-cols-2 gap-16 items-center">
 
                     {/* Hero Content */}
-                    {/* Hero Content */}
                     <div className="space-y-8">
                         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-primary-foreground/80 text-sm font-medium backdrop-blur-md shadow-sm">
                             <span className="relative flex h-2 w-2">
@@ -173,7 +172,7 @@ export const LandingPage: React.FC = () => {
                                     <CardTitle className="text-3xl font-bold text-center">
                                         {user
                                             ? 'Resume Workspace'
-                                            : (isLogin ? 'Welcome back' : 'Join the revolution')
+                                            : (isLogin ? 'Sign In to TeamOps' : 'Join the revolution')
                                         }
                                     </CardTitle>
                                     <CardDescription className="text-center text-muted-foreground/80">
@@ -297,4 +296,3 @@ const FeatureBadge = ({ icon, text }: { icon: React.ReactNode, text: string }) =
         <span>{text}</span>
     </div>
 );
-
