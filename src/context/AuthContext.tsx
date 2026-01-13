@@ -3,6 +3,20 @@ import { useDatabase } from '../hooks/useDatabase';
 import type { User } from '../db/schemas';
 import { supabase } from '../lib/supabase';
 
+// Helper for password hashing
+const hashPassword = async (password: string, salt: string) => {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password + salt);
+    const hash = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+};
+
+interface CachedCredentials {
+    email: string; // or username
+    passwordHash: string;
+    salt: string;
+}
+
 interface AuthContextType {
     user: User | null;
     login: (email: string, password: string) => Promise<boolean>;
@@ -22,24 +36,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     useEffect(() => {
         if (!db) return; // Wait for DB to be initialized
 
-        // Check active session
-        supabase.auth.getSession().then(({ data: { session } }) => {
+        const initAuth = async () => {
+            // 1. Try Supabase Session (Online)
+            const { data: { session } } = await supabase.auth.getSession();
             if (session?.user) {
+                console.log("Supabase session found:", session.user.email);
                 syncUser(session.user);
-            } else {
-                setUser(null);
-                setIsLoading(false);
+                return;
             }
-        });
+
+            // 2. Try Persistent Session (Offline/Fallback)
+            const lastUserId = localStorage.getItem('last_user_id');
+            if (lastUserId) {
+                console.log("Checking for persistent user:", lastUserId);
+                const userDoc = await db.users.findOne(lastUserId).exec();
+                if (userDoc) {
+                    console.log("Restoring persistent user:", userDoc.toJSON());
+                    setUser(userDoc.toJSON() as User);
+                    setIsLoading(false);
+                    return;
+                }
+            }
+
+            // 3. No session found
+            console.log("No session found.");
+            setUser(null);
+            setIsLoading(false);
+        };
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             if (session?.user) {
                 syncUser(session.user);
-            } else {
-                setUser(null);
-                setIsLoading(false);
+            } else if (!user) { // Only clear if we aren't already logged in locally
+                // Wait, onAuthStateChange fires on logout too.
+                // If event is 'SIGNED_OUT', we should clear.
+                if (_event === 'SIGNED_OUT') {
+                    setUser(null);
+                    setIsLoading(false);
+                }
             }
         });
+
+        initAuth();
 
         return () => subscription.unsubscribe();
     }, [db]);
@@ -65,6 +103,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Upsert to local DB so offline works
         try {
             await db.users.upsert(localUser);
+            // PERSISTENCE: Save ID for offline restoration
+            localStorage.setItem('last_user_id', localUser.id);
             setUser(localUser);
         } catch (e) {
             console.error("Failed to sync user to local DB", e);
@@ -74,12 +114,67 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const login = async (email: string, password: string) => {
-        const { error } = await supabase.auth.signInWithPassword({
-            email,
-            password
-        });
-        if (error) throw error;
-        return true;
+        try {
+            const { error } = await supabase.auth.signInWithPassword({
+                email,
+                password
+            });
+            if (error) throw error;
+
+            // Online login success -> Cache credentials
+            const salt = crypto.randomUUID();
+            const hash = await hashPassword(password, salt);
+            const creds: CachedCredentials = { email, passwordHash: hash, salt };
+            localStorage.setItem('offline_creds', JSON.stringify(creds));
+
+            return true;
+        } catch (error: any) {
+            // Offline fallback
+            console.log("Login error caught:", error);
+            if (error.message?.includes('Failed to fetch') || error.message?.includes('fetch') || !navigator.onLine) {
+                console.log("Attempting offline login...");
+                const stored = localStorage.getItem('offline_creds');
+                console.log("Stored creds found:", !!stored);
+
+                if (stored) {
+                    const creds: CachedCredentials = JSON.parse(stored);
+                    console.log("Comparing emails:", creds.email, email);
+
+                    if (creds.email.toLowerCase() === email.toLowerCase()) {
+                        console.log("Email matches. Checking hash...");
+                        const hash = await hashPassword(password, creds.salt);
+
+                        if (hash === creds.passwordHash) {
+                            console.log("Hash matches! credential valid.");
+                            // Offline credentials match!
+                            // Try to load user from local DB
+                            if (db) {
+                                console.log("Searching user in RxDB...");
+                                const userDoc = await db.users.findOne({ selector: { email } }).exec();
+                                console.log("User doc found:", userDoc?.toJSON());
+
+                                if (userDoc) {
+                                    console.log("Offline login successful with local user");
+                                    const userData = userDoc.toJSON() as User;
+                                    localStorage.setItem('last_user_id', userData.id); // Add this
+                                    setUser(userData);
+                                    return true;
+                                } else {
+                                    console.warn("User not found in local DB despite valid credentials.");
+                                }
+                            } else {
+                                console.error("Database not initialized during offline exception.");
+                            }
+                        } else {
+                            console.warn("Password hash mismatch.");
+                        }
+                    } else {
+                        console.warn("Email mismatch in stored creds.");
+                    }
+                }
+            }
+            throw error;
+        }
     };
 
     const signup = async (data: Omit<User, 'id' | 'createdAt'>) => {
@@ -150,9 +245,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch (e) {
             console.warn("Error cleaning up DB on logout", e);
         } finally {
-            // NUCLEAR OPTION: Clear everything to ensure no session survives
-            localStorage.clear();
+            // NUCLEAR OPTION: Clear session but SHARE THE LOVE (keep offline_creds)
+            // localStorage.clear(); 
+            localStorage.removeItem('last_user_id'); // Forget auto-login
+            localStorage.removeItem('sb-access-token'); // Clear Supabase (example key)
+            localStorage.removeItem('sb-refresh-token');
             sessionStorage.clear();
+
+            // Note: We intentionally keep 'offline_creds' to allow re-login while offline
 
             setUser(null);
 

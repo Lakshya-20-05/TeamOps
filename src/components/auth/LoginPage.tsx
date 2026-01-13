@@ -21,12 +21,16 @@ export const LoginPage: React.FC = () => {
             const success = await login(username, password);
             if (success) {
                 navigate('/');
-            } else {
-                setError("Invalid username or password");
             }
-        } catch (err) {
-            setError("An error occurred during login");
+        } catch (err: any) {
             console.error(err);
+            // Normalized error message check
+            const errMsg = (err.message || JSON.stringify(err) || '').toLowerCase();
+            if (!navigator.onLine || errMsg.includes('fetch') || errMsg.includes('network')) {
+                setError("Offline login failed. Invalid credentials or no cached session.");
+            } else {
+                setError(err.message || "An error occurred during login");
+            }
         }
     };
 
@@ -41,6 +45,12 @@ export const LoginPage: React.FC = () => {
                 </CardHeader>
                 <form onSubmit={handleSubmit}>
                     <CardContent className="space-y-4">
+                        {/* Debug/Status Badge */}
+                        {localStorage.getItem('offline_creds') && (
+                            <div className="bg-green-500/10 text-green-500 text-xs px-2 py-1 rounded-md mb-2 text-center border border-green-500/20">
+                                ✓ Offline Access Ready
+                            </div>
+                        )}
                         <div className="space-y-2">
                             <Label htmlFor="username">Username</Label>
                             <Input
