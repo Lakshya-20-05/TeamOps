@@ -164,12 +164,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                                 }
                             } else {
                                 console.error("Database not initialized during offline exception.");
+                                console.warn("Password hash mismatch.");
+                                throw new Error("Offline login failed: Incorrect password.");
                             }
                         } else {
-                            console.warn("Password hash mismatch.");
+                            console.warn("Email mismatch in stored creds.");
+                            throw new Error("Offline login failed: Email mismatch.");
                         }
                     } else {
-                        console.warn("Email mismatch in stored creds.");
+                        // No stored credentials, so offline login is not possible
+                        throw new Error("Connection failed and no offline credentials found.");
                     }
                 }
             }
@@ -259,14 +263,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             // Hard redirect to root to clear memory and trigger login page
             window.location.href = '/';
         }
-    };
+    }; // End logout
 
     return (
         <AuthContext.Provider value={{ user, login, signup, logout, isAuthenticated: !!user, isLoading }}>
             {children}
         </AuthContext.Provider>
     );
-};
+}; // End AuthProvider component
 
 export const useAuth = () => {
     const context = useContext(AuthContext);
