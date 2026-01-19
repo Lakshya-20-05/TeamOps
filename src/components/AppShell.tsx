@@ -23,6 +23,7 @@ export const AppShell: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const [unreadCount, setUnreadCount] = useState(0);
+    const [pendingInvitationsCount, setPendingInvitationsCount] = useState(0);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     const { showToast } = useToast();
@@ -36,6 +37,7 @@ export const AppShell: React.FC = () => {
         if (!user) return;
         let sub: any;
         let insertSub: any;
+        let inviteSub: any;
 
         const setupSubscription = async () => {
             const db = await getDatabase();
@@ -48,6 +50,16 @@ export const AppShell: React.FC = () => {
                 }
             }).$.subscribe(notifications => {
                 setUnreadCount(notifications.length);
+            });
+
+            // 1b. Track pending invitations count for smart tab navigation
+            inviteSub = db.invitations.find({
+                selector: {
+                    receiverId: user.id,
+                    status: 'pending'
+                }
+            }).$.subscribe(invites => {
+                setPendingInvitationsCount(invites.length);
             });
 
             // 2. Realtime Toasts for NEW notifications
@@ -71,6 +83,7 @@ export const AppShell: React.FC = () => {
         return () => {
             if (sub) sub.unsubscribe();
             if (insertSub) insertSub.unsubscribe();
+            if (inviteSub) inviteSub.unsubscribe();
         };
     }, [user, showToast]);
 
@@ -107,11 +120,9 @@ export const AppShell: React.FC = () => {
                 <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
                     <NavItem to="/app" end icon={<LayoutDashboard size={18} />} label="Dashboard" />
                     <NavItem to="/app/teams" icon={<Users size={18} />} label="Teams" />
-                    <NavItem
-                        to="/app/notifications"
-                        icon={<Bell size={18} />}
-                        label="Notifications"
-                        badge={unreadCount}
+                    <SmartNotificationLink
+                        unreadAlerts={unreadCount}
+                        pendingInvitations={pendingInvitationsCount}
                     />
                 </nav>
 
@@ -205,3 +216,51 @@ const NavItem = ({ to, icon, label, badge, end }: { to: string, icon: React.Reac
         </span>
     </NavLink>
 );
+
+// Smart notification link that determines which tab to open
+const SmartNotificationLink = ({ unreadAlerts, pendingInvitations }: { unreadAlerts: number, pendingInvitations: number }) => {
+    const location = useLocation();
+    const navigate = useNavigate();
+
+    // Determine which tab to open:
+    // - If only invitations pending (no alerts) -> open invitations tab
+    // - If alerts exist OR both exist OR neither -> open alerts tab (default)
+    const getTargetTab = () => {
+        if (pendingInvitations > 0 && unreadAlerts === 0) {
+            return 'invitations';
+        }
+        return 'alerts';
+    };
+
+    const handleClick = (e: React.MouseEvent) => {
+        e.preventDefault();
+        const tab = getTargetTab();
+        navigate(`/app/notifications?tab=${tab}`);
+    };
+
+    const totalBadge = unreadAlerts + pendingInvitations;
+    const isActive = location.pathname.startsWith('/app/notifications');
+
+    return (
+        <a
+            href="/app/notifications"
+            onClick={handleClick}
+            className={cn(
+                "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 cursor-pointer",
+                isActive
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
+        >
+            <Bell size={18} />
+            <span className="flex-1 transition-all duration-300">Notifications</span>
+            <span className={cn(
+                "flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-bold text-white bg-destructive rounded-full shadow-sm transition-all duration-300 transform",
+                totalBadge > 0 ? "scale-100 opacity-100" : "scale-0 opacity-0 w-0 px-0 min-w-0 overflow-hidden"
+            )}>
+                {totalBadge > 99 ? '99+' : totalBadge}
+            </span>
+        </a>
+    );
+};
+

@@ -58,6 +58,7 @@ export const TaskStatusChart: React.FC<TaskStatusChartProps> = ({ todo, inProgre
         plugins: {
             legend: {
                 position: 'bottom' as const,
+                align: 'start' as const,
                 labels: {
                     usePointStyle: true,
                     padding: 20,
@@ -72,7 +73,7 @@ export const TaskStatusChart: React.FC<TaskStatusChartProps> = ({ todo, inProgre
             <CardHeader>
                 <CardTitle className="text-base">Task Status</CardTitle>
             </CardHeader>
-            <CardContent className="h-[200px]">
+            <CardContent className="h-[280px]">
                 <Doughnut data={data} options={options} />
             </CardContent>
         </Card>

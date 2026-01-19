@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getDatabase } from '../db/database';
 import type { Invitation, Notification } from '../db/schemas';
@@ -58,8 +59,12 @@ function FixSyncButton() {
 
 export function NotificationsPage() {
     const { user } = useAuth();
+    const [searchParams] = useSearchParams();
     const [invitations, setInvitations] = useState<InvitationWithDetails[]>([]);
     const [loading, setLoading] = useState(true);
+
+    // Get the tab from URL query parameter, default to 'alerts'
+    const defaultTab = searchParams.get('tab') === 'invitations' ? 'invitations' : 'alerts';
 
     useEffect(() => {
         if (!user) return;
@@ -179,7 +184,7 @@ export function NotificationsPage() {
                 <FixSyncButton />
             </div>
 
-            <Tabs defaultValue="alerts" className="w-full">
+            <Tabs defaultValue={defaultTab} className="w-full">
                 <TabsList>
                     <TabsTrigger value="alerts">Alerts</TabsTrigger>
                     <TabsTrigger value="invitations">

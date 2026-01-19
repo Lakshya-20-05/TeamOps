@@ -16,17 +16,20 @@ import './index.css';
 import { DatabaseProvider } from './hooks/useDatabase';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
-    <DatabaseProvider>
-      <AuthProvider>
-        <ToastProvider>
-          <BrowserRouter>
-            <App />
-          </BrowserRouter>
-        </ToastProvider>
-      </AuthProvider>
-    </DatabaseProvider>
+    <ErrorBoundary>
+      <DatabaseProvider>
+        <AuthProvider>
+          <ToastProvider>
+            <BrowserRouter>
+              <App />
+            </BrowserRouter>
+          </ToastProvider>
+        </AuthProvider>
+      </DatabaseProvider>
+    </ErrorBoundary>
   </React.StrictMode>
 );

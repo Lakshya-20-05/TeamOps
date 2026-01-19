@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
 import { DashboardPage } from './components/DashboardPage';
 import { TeamsPage } from './components/TeamsPage';
@@ -32,10 +32,15 @@ function App() {
         <Route path="join/:teamId" element={<JoinTeamPage />} />
       </Route>
 
-      {/* Legacy Join Route - Redirect or Handle */}
-      {/* Keeping legacy join route direct for simplicity, or moving under /app/join */}
+      {/* Redirect Legacy Join Links */}
+      <Route path="/join/:teamId" element={<JoinRedirect />} />
     </Routes>
   );
+}
+
+function JoinRedirect() {
+  const { teamId } = useParams();
+  return <Navigate to={`/app/join/${teamId}`} replace />;
 }
 
 export default App;
