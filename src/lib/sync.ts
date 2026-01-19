@@ -160,7 +160,7 @@ export const syncCollection = async (
 
     const replicationState = await replicateRxCollection({
         collection,
-        replicationIdentifier: `sync-v6-${tableName}`, // Bumped to v6 (Remove local filter)
+        replicationIdentifier: `sync-v7-${tableName}`, // Bumped to v7 (Added attachments support)
         pull: {
             handler: pullHandler,
             batchSize: 50,

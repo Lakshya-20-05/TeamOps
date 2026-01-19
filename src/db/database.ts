@@ -114,6 +114,11 @@ const _create = async (): Promise<MyDatabase> => {
                         // existing tasks are ongoing or done, but we don't have time.
                         // Leave undefined.
                         return oldDoc;
+                    },
+                    3: function (oldDoc: any) {
+                        // Task migration v3: Add attachments array
+                        oldDoc.attachments = [];
+                        return oldDoc;
                     }
                 }
             },

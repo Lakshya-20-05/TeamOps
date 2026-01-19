@@ -30,16 +30,26 @@ export interface Team {
     updatedAt?: string;
 }
 
+export interface TaskAttachment {
+    id: string;
+    name: string;
+    type: string; // MIME type
+    size: number; // bytes
+    data: string; // base64 encoded
+    createdAt: string;
+}
+
 export interface Task {
     id: string;
     title: string;
     description: string;
     status: 'todo' | 'in-progress' | 'done';
-    priority?: 'low' | 'medium' | 'high'; // Added
-    deadline?: string; // Added (ISO Date string)
-    completedAt?: string; // Added (ISO Date string)
+    priority?: 'low' | 'medium' | 'high';
+    deadline?: string;
+    completedAt?: string;
     teamId: string;
-    assigneeId?: string; // User ID
+    assigneeId?: string;
+    attachments?: TaskAttachment[]; // New: offline file attachments
     createdAt: string;
     updatedAt: string;
 }
@@ -148,7 +158,7 @@ export const teamSchema: RxJsonSchema<Team> = {
 };
 
 export const taskSchema: RxJsonSchema<Task> = {
-    version: 2, // Bumped
+    version: 3, // Bumped for attachments
     primaryKey: 'id',
     type: 'object',
     properties: {
@@ -173,7 +183,7 @@ export const taskSchema: RxJsonSchema<Task> = {
         deadline: {
             type: 'string'
         },
-        completedAt: { // Added
+        completedAt: {
             type: 'string',
             format: 'date-time'
         },
@@ -182,6 +192,21 @@ export const taskSchema: RxJsonSchema<Task> = {
         },
         assigneeId: {
             type: 'string'
+        },
+        attachments: {
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    id: { type: 'string' },
+                    name: { type: 'string' },
+                    type: { type: 'string' },
+                    size: { type: 'number' },
+                    data: { type: 'string' },
+                    createdAt: { type: 'string' }
+                },
+                required: ['id', 'name', 'type', 'size', 'data', 'createdAt']
+            }
         },
         createdAt: {
             type: 'string',

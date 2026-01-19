@@ -2,19 +2,20 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDatabase } from '../hooks/useDatabase';
 import { useAuth } from '../context/AuthContext';
-import type { Team, Task } from '../db/schemas';
+import type { Team, Task, TaskAttachment } from '../db/schemas';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from '@radix-ui/react-label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Copy, Check, UserPlus, Calendar as CalendarIcon, Loader2, Plus, CheckCircle2, Clock, AlertCircle, Trash2 } from 'lucide-react';
+import { Copy, Check, UserPlus, Calendar as CalendarIcon, Loader2, Plus, CheckCircle2, Clock, AlertCircle, Trash2, Paperclip, ChevronDown } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar } from './ui/calendar';
 import { v4 as uuidv4 } from 'uuid';
 import { format, isAfter, parseISO } from 'date-fns';
 import { cn } from '../lib/utils';
+import { FileAttachment } from './FileAttachment';
 
 export const TeamDetailsPage: React.FC = () => {
     const { teamId } = useParams<{ teamId: string }>();
@@ -34,6 +35,8 @@ export const TeamDetailsPage: React.FC = () => {
     const [newTaskDeadline, setNewTaskDeadline] = useState('');
     const [newTaskPriority, setNewTaskPriority] = useState<'low' | 'medium' | 'high'>('medium');
     const [newTaskAssignee, setNewTaskAssignee] = useState('');
+    const [newTaskAttachments, setNewTaskAttachments] = useState<TaskAttachment[]>([]);
+    const [expandedAttachments, setExpandedAttachments] = useState<Set<string>>(new Set());
 
     // Add Member Dialog Logic
     const [addMemberOpen, setAddMemberOpen] = useState(false);
@@ -136,6 +139,7 @@ export const TeamDetailsPage: React.FC = () => {
             deadline: newTaskDeadline || undefined,
             teamId: teamId,
             assigneeId: newTaskAssignee || user.id,
+            attachments: newTaskAttachments,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
         });
@@ -161,6 +165,7 @@ export const TeamDetailsPage: React.FC = () => {
         setNewTaskTitle('');
         setNewTaskDesc('');
         setNewTaskDeadline('');
+        setNewTaskAttachments([]);
     };
 
     const handleCompleteTask = async (task: Task) => {
@@ -330,6 +335,15 @@ export const TeamDetailsPage: React.FC = () => {
                                         <Label>Description</Label>
                                         <Input value={newTaskDesc} onChange={e => setNewTaskDesc(e.target.value)} placeholder="Task details (required)" required />
                                     </div>
+                                    <div className="space-y-2">
+                                        <Label>Attachments (optional)</Label>
+                                        <FileAttachment
+                                            attachments={newTaskAttachments}
+                                            onAttach={(att) => setNewTaskAttachments(prev => [...prev, att])}
+                                            onRemove={(id) => setNewTaskAttachments(prev => prev.filter(a => a.id !== id))}
+                                            maxSizeMB={5}
+                                        />
+                                    </div>
                                 </div>
                                 <DialogFooter>
                                     <Button type="submit">Assign Task</Button>
@@ -489,7 +503,49 @@ export const TeamDetailsPage: React.FC = () => {
                                                     {format(parseISO(task.deadline), 'MMM d, yyyy')}
                                                 </div>
                                             )}
+                                            {task.attachments && task.attachments.length > 0 && (
+                                                <div className="flex items-center gap-1 text-primary">
+                                                    <Paperclip size={12} />
+                                                    <span>{task.attachments.length} file(s)</span>
+                                                </div>
+                                            )}
                                         </div>
+                                        {/* Attachments Dropdown */}
+                                        {task.attachments && task.attachments.length > 0 && (
+                                            <div className="mt-3 pt-3 border-t">
+                                                <button
+                                                    className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full"
+                                                    onClick={() => {
+                                                        setExpandedAttachments(prev => {
+                                                            const next = new Set(prev);
+                                                            if (next.has(task.id)) {
+                                                                next.delete(task.id);
+                                                            } else {
+                                                                next.add(task.id);
+                                                            }
+                                                            return next;
+                                                        });
+                                                    }}
+                                                >
+                                                    <ChevronDown
+                                                        size={16}
+                                                        className={cn(
+                                                            "transition-transform",
+                                                            expandedAttachments.has(task.id) && "rotate-180"
+                                                        )}
+                                                    />
+                                                    <span>View {task.attachments.length} attachment(s)</span>
+                                                </button>
+                                                {expandedAttachments.has(task.id) && (
+                                                    <div className="mt-3">
+                                                        <FileAttachment
+                                                            attachments={task.attachments}
+                                                            readOnly={true}
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="flex items-center gap-2">
