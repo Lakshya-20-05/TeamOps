@@ -39,6 +39,16 @@ export interface TaskAttachment {
     createdAt: string;
 }
 
+export interface TaskUpdate {
+    id: string;
+    authorId: string;
+    percentComplete: number; // 0-100
+    workSummary?: string;
+    problemsFaced?: string;
+    resourcesNeeded?: string;
+    createdAt: string;
+}
+
 export interface Task {
     id: string;
     title: string;
@@ -49,7 +59,28 @@ export interface Task {
     completedAt?: string;
     teamId: string;
     assigneeId?: string;
-    attachments?: TaskAttachment[]; // New: offline file attachments
+    attachments?: TaskAttachment[];
+    updates?: TaskUpdate[]; // Progress updates timeline
+    percentComplete?: number; // Current overall % complete (0-100)
+    activityId?: string; // Optional link to parent activity
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface Project {
+    id: string;
+    name: string;
+    description?: string;
+    teamId: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface Activity {
+    id: string;
+    name: string;
+    description?: string;
+    projectId: string;
     createdAt: string;
     updatedAt: string;
 }
@@ -158,7 +189,7 @@ export const teamSchema: RxJsonSchema<Team> = {
 };
 
 export const taskSchema: RxJsonSchema<Task> = {
-    version: 3, // Bumped for attachments
+    version: 5, // Bumped for activityId field
     primaryKey: 'id',
     type: 'object',
     properties: {
@@ -208,6 +239,60 @@ export const taskSchema: RxJsonSchema<Task> = {
                 required: ['id', 'name', 'type', 'size', 'data', 'createdAt']
             }
         },
+        updates: {
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    id: { type: 'string' },
+                    authorId: { type: 'string' },
+                    percentComplete: { type: 'number' },
+                    workSummary: { type: 'string' },
+                    problemsFaced: { type: 'string' },
+                    resourcesNeeded: { type: 'string' },
+                    createdAt: { type: 'string' }
+                },
+                required: ['id', 'authorId', 'percentComplete', 'createdAt']
+            }
+        },
+        percentComplete: {
+            type: 'number',
+            minimum: 0,
+            maximum: 100
+        },
+        createdAt: {
+            type: 'string',
+            format: 'date-time'
+        },
+        updatedAt: {
+            type: 'string',
+            format: 'date-time'
+        },
+        activityId: {
+            type: 'string'
+        }
+    },
+    required: ['id', 'title', 'status', 'createdAt', 'teamId']
+};
+
+export const projectSchema: RxJsonSchema<Project> = {
+    version: 0,
+    primaryKey: 'id',
+    type: 'object',
+    properties: {
+        id: {
+            type: 'string',
+            maxLength: 100
+        },
+        name: {
+            type: 'string'
+        },
+        description: {
+            type: 'string'
+        },
+        teamId: {
+            type: 'string'
+        },
         createdAt: {
             type: 'string',
             format: 'date-time'
@@ -217,7 +302,37 @@ export const taskSchema: RxJsonSchema<Task> = {
             format: 'date-time'
         }
     },
-    required: ['id', 'title', 'status', 'createdAt', 'teamId']
+    required: ['id', 'name', 'teamId', 'createdAt', 'updatedAt']
+};
+
+export const activitySchema: RxJsonSchema<Activity> = {
+    version: 0,
+    primaryKey: 'id',
+    type: 'object',
+    properties: {
+        id: {
+            type: 'string',
+            maxLength: 100
+        },
+        name: {
+            type: 'string'
+        },
+        description: {
+            type: 'string'
+        },
+        projectId: {
+            type: 'string'
+        },
+        createdAt: {
+            type: 'string',
+            format: 'date-time'
+        },
+        updatedAt: {
+            type: 'string',
+            format: 'date-time'
+        }
+    },
+    required: ['id', 'name', 'projectId', 'createdAt', 'updatedAt']
 };
 
 export const invitationSchema: RxJsonSchema<Invitation> = {

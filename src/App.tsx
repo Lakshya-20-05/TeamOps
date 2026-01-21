@@ -10,6 +10,9 @@ import { ProfilePage } from './components/ProfilePage';
 import { TeamDetailsPage } from './components/TeamDetailsPage';
 import { NotificationsPage } from './components/NotificationsPage';
 import { LandingPage } from './components/LandingPage';
+import { ProjectsPage } from './components/ProjectsPage';
+import { ActivitiesPage } from './components/ActivitiesPage';
+import { ActivityTasksPage } from './components/ActivityTasksPage';
 
 function App() {
   return (
@@ -27,6 +30,9 @@ function App() {
         <Route index element={<DashboardPage />} />
         <Route path="teams" element={<TeamsPage />} />
         <Route path="teams/:teamId" element={<TeamDetailsPage />} />
+        <Route path="teams/:teamId/projects" element={<ProjectsPage />} />
+        <Route path="projects/:projectId" element={<ActivitiesPage />} />
+        <Route path="activities/:activityId/tasks" element={<ActivityTasksPage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="join/:teamId" element={<JoinTeamPage />} />

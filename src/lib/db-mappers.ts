@@ -59,6 +59,8 @@ export const mapTaskToRemote = (task: any) => ({
     team_id: task.teamId,
     assignee_id: task.assigneeId,
     attachments: task.attachments || [], // JSONB array
+    updates: task.updates || [], // JSONB array for progress updates
+    percent_complete: task.percentComplete ?? null,
     created_at: task.createdAt,
     updated_at: task.updatedAt, // Critical for sync pagination
     deleted: !!task._deleted
@@ -75,6 +77,8 @@ export const mapTaskToLocal = (row: any): Task & { _deleted?: boolean } => ({
     teamId: row.team_id,
     assigneeId: row.assignee_id || undefined,
     attachments: row.attachments || [],
+    updates: row.updates || [],
+    percentComplete: row.percent_complete ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     _deleted: row.deleted

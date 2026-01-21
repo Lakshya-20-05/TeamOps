@@ -12,6 +12,8 @@ import {
     userSchema,
     teamSchema,
     taskSchema,
+    projectSchema,
+    activitySchema,
     invitationSchema,
     notificationSchema
 } from './schemas';
@@ -119,8 +121,25 @@ const _create = async (): Promise<MyDatabase> => {
                         // Task migration v3: Add attachments array
                         oldDoc.attachments = [];
                         return oldDoc;
+                    },
+                    4: function (oldDoc: any) {
+                        // Task migration v4: Add updates array and percentComplete
+                        oldDoc.updates = [];
+                        oldDoc.percentComplete = undefined;
+                        return oldDoc;
+                    },
+                    5: function (oldDoc: any) {
+                        // Task migration v5: Add activityId
+                        oldDoc.activityId = undefined;
+                        return oldDoc;
                     }
                 }
+            },
+            projects: {
+                schema: projectSchema
+            },
+            activities: {
+                schema: activitySchema
             },
             invitations: {
                 schema: invitationSchema

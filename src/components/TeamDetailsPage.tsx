@@ -2,20 +2,21 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDatabase } from '../hooks/useDatabase';
 import { useAuth } from '../context/AuthContext';
-import type { Team, Task, TaskAttachment } from '../db/schemas';
+import type { Team, Task, TaskAttachment, TaskUpdate } from '../db/schemas';
 import { Button } from './ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from '@radix-ui/react-label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Copy, Check, UserPlus, Calendar as CalendarIcon, Loader2, Plus, CheckCircle2, Clock, AlertCircle, Trash2, Paperclip, ChevronDown } from 'lucide-react';
+import { Copy, Check, UserPlus, Calendar as CalendarIcon, Loader2, Plus, CheckCircle2, Clock, AlertCircle, Trash2, Paperclip, ChevronDown, FolderKanban, CalendarDays } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar } from './ui/calendar';
 import { v4 as uuidv4 } from 'uuid';
 import { format, isAfter, parseISO } from 'date-fns';
 import { cn } from '../lib/utils';
 import { FileAttachment } from './FileAttachment';
+import { TaskProgressUpdate } from './TaskProgressUpdate';
+import { downloadICS, downloadCSV } from '../lib/calendarExport';
 
 export const TeamDetailsPage: React.FC = () => {
     const { teamId } = useParams<{ teamId: string }>();
@@ -252,106 +253,141 @@ export const TeamDetailsPage: React.FC = () => {
                     <h2 className="text-3xl font-bold tracking-tight">{team.name}</h2>
                     <p className="text-muted-foreground">{team.description || 'Workspace details'}</p>
                 </div>
-                {isAdmin && (
-                    <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
-                        <DialogTrigger asChild>
-                            <Button>
-                                <Plus className="mr-2 h-4 w-4" /> Assign Task
+                <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => navigate(`/app/teams/${teamId}/projects`)}>
+                        <FolderKanban className="mr-2 h-4 w-4" /> View Projects
+                    </Button>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button
+                                variant="outline"
+                                disabled={!tasks.some(t => t.deadline)}
+                            >
+                                <CalendarDays className="mr-2 h-4 w-4" /> Export Calendar
                             </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-[425px]">
-                            <form onSubmit={handleAssignTask}>
-                                <DialogHeader>
-                                    <DialogTitle>Assign Task</DialogTitle>
-                                    <DialogDescription>Create a new task for a team member.</DialogDescription>
-                                </DialogHeader>
-                                <div className="grid gap-4 py-4">
-                                    <div className="space-y-2">
-                                        <Label>Title</Label>
-                                        <Input value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} placeholder="Task title" required />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Assigned To</Label>
-                                        <select
-                                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                            value={newTaskAssignee}
-                                            onChange={e => setNewTaskAssignee(e.target.value)}
-                                            required
-                                        >
-                                            <option value="">Select Member...</option>
-                                            {members.filter(m => m.role === 'member').map(m => (
-                                                <option key={m.id} value={m.id}>{m.name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2 flex flex-col">
-                                            <Label className="mb-1">Deadline</Label>
-                                            <Popover>
-                                                <PopoverTrigger asChild>
-                                                    <Button
-                                                        variant={"outline"}
-                                                        className={cn(
-                                                            "w-full pl-3 text-left font-normal",
-                                                            !newTaskDeadline && "text-muted-foreground"
-                                                        )}
-                                                    >
-                                                        {newTaskDeadline ? (
-                                                            format(parseISO(newTaskDeadline), "PPP")
-                                                        ) : (
-                                                            <span>Pick a date</span>
-                                                        )}
-                                                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                                    </Button>
-                                                </PopoverTrigger>
-                                                <PopoverContent className="w-auto p-0" align="start">
-                                                    <Calendar
-                                                        mode="single"
-                                                        selected={newTaskDeadline ? parseISO(newTaskDeadline) : undefined}
-                                                        onSelect={(date) => date && setNewTaskDeadline(date.toISOString())}
-                                                        disabled={(date) =>
-                                                            date < new Date("1900-01-01")
-                                                        }
-                                                        initialFocus
-                                                    />
-                                                </PopoverContent>
-                                            </Popover>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-48 p-2">
+                            <div className="flex flex-col gap-1">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="justify-start"
+                                    onClick={() => downloadICS(tasks.filter(t => t.deadline), `${team.name}-deadlines.ics`, `${team.name} Deadlines`)}
+                                >
+                                    Export as ICS
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="justify-start"
+                                    onClick={() => downloadCSV(tasks.filter(t => t.deadline), `${team.name}-deadlines.csv`)}
+                                >
+                                    Export as CSV
+                                </Button>
+                            </div>
+                        </PopoverContent>
+                    </Popover>
+                    {isAdmin && (
+                        <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
+                            <DialogTrigger asChild>
+                                <Button>
+                                    <Plus className="mr-2 h-4 w-4" /> Assign Task
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-[425px]">
+                                <form onSubmit={handleAssignTask}>
+                                    <DialogHeader>
+                                        <DialogTitle>Assign Task</DialogTitle>
+                                        <DialogDescription>Create a new task for a team member.</DialogDescription>
+                                    </DialogHeader>
+                                    <div className="grid gap-4 py-4">
+                                        <div className="space-y-2">
+                                            <Label>Title</Label>
+                                            <Input value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} placeholder="Task title" required />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label>Priority</Label>
+                                            <Label>Assigned To</Label>
                                             <select
                                                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                                value={newTaskPriority}
-                                                onChange={e => setNewTaskPriority(e.target.value as any)}
+                                                value={newTaskAssignee}
+                                                onChange={e => setNewTaskAssignee(e.target.value)}
                                                 required
                                             >
-                                                <option value="low">Low</option>
-                                                <option value="medium">Medium</option>
-                                                <option value="high">High</option>
+                                                <option value="">Select Member...</option>
+                                                {members.filter(m => m.role === 'member').map(m => (
+                                                    <option key={m.id} value={m.id}>{m.name}</option>
+                                                ))}
                                             </select>
                                         </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2 flex flex-col">
+                                                <Label className="mb-1">Deadline</Label>
+                                                <Popover>
+                                                    <PopoverTrigger asChild>
+                                                        <Button
+                                                            variant={"outline"}
+                                                            className={cn(
+                                                                "w-full pl-3 text-left font-normal",
+                                                                !newTaskDeadline && "text-muted-foreground"
+                                                            )}
+                                                        >
+                                                            {newTaskDeadline ? (
+                                                                format(parseISO(newTaskDeadline), "PPP")
+                                                            ) : (
+                                                                <span>Pick a date</span>
+                                                            )}
+                                                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                                        </Button>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent className="w-auto p-0" align="start">
+                                                        <Calendar
+                                                            mode="single"
+                                                            selected={newTaskDeadline ? parseISO(newTaskDeadline) : undefined}
+                                                            onSelect={(date) => date && setNewTaskDeadline(date.toISOString())}
+                                                            disabled={(date) =>
+                                                                date < new Date("1900-01-01")
+                                                            }
+                                                            initialFocus
+                                                        />
+                                                    </PopoverContent>
+                                                </Popover>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>Priority</Label>
+                                                <select
+                                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                                    value={newTaskPriority}
+                                                    onChange={e => setNewTaskPriority(e.target.value as any)}
+                                                    required
+                                                >
+                                                    <option value="low">Low</option>
+                                                    <option value="medium">Medium</option>
+                                                    <option value="high">High</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Description</Label>
+                                            <Input value={newTaskDesc} onChange={e => setNewTaskDesc(e.target.value)} placeholder="Task details (required)" required />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Attachments (optional)</Label>
+                                            <FileAttachment
+                                                attachments={newTaskAttachments}
+                                                onAttach={(att) => setNewTaskAttachments(prev => [...prev, att])}
+                                                onRemove={(id) => setNewTaskAttachments(prev => prev.filter(a => a.id !== id))}
+                                                maxSizeMB={5}
+                                            />
+                                        </div>
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label>Description</Label>
-                                        <Input value={newTaskDesc} onChange={e => setNewTaskDesc(e.target.value)} placeholder="Task details (required)" required />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Attachments (optional)</Label>
-                                        <FileAttachment
-                                            attachments={newTaskAttachments}
-                                            onAttach={(att) => setNewTaskAttachments(prev => [...prev, att])}
-                                            onRemove={(id) => setNewTaskAttachments(prev => prev.filter(a => a.id !== id))}
-                                            maxSizeMB={5}
-                                        />
-                                    </div>
-                                </div>
-                                <DialogFooter>
-                                    <Button type="submit">Assign Task</Button>
-                                </DialogFooter>
-                            </form>
-                        </DialogContent>
-                    </Dialog>
-                )}
+                                    <DialogFooter>
+                                        <Button type="submit">Assign Task</Button>
+                                    </DialogFooter>
+                                </form>
+                            </DialogContent>
+                        </Dialog>
+                    )}
+                </div>
             </div>
 
             <Dialog open={!!memberToRemove} onOpenChange={(open) => !open && setMemberToRemove(null)}>
@@ -423,42 +459,38 @@ export const TeamDetailsPage: React.FC = () => {
 
             <div className="grid gap-6 md:grid-cols-3">
                 <div className="md:col-span-1 space-y-4">
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                            <CardTitle className="text-lg">Members ({members.length})</CardTitle>
-                            {isAdmin && (
-                                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setAddMemberOpen(true)}>
-                                    <UserPlus className="h-4 w-4" />
-                                </Button>
-                            )}
-                        </CardHeader>
-                        <CardContent className="space-y-2">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-xl font-bold">Members ({members.length})</h3>
+                        {isAdmin && (
+                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setAddMemberOpen(true)}>
+                                <UserPlus className="h-4 w-4" />
+                            </Button>
+                        )}
+                    </div>
+                    <div className="p-4 rounded-lg border bg-card">
+                        <div className="grid grid-cols-2 gap-2">
                             {members.map(m => (
-                                <div key={m.id} className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
-                                            {m.name.charAt(0).toUpperCase()}
-                                        </div>
-                                        <div>
-                                            <div className="text-sm font-medium">{m.name}</div>
-                                            <div className="text-xs text-muted-foreground capitalize">{m.role}</div>
-                                        </div>
+                                <div key={m.id} className="relative flex flex-col items-center p-3 rounded-lg border border-border/50 hover:bg-muted/50 group">
+                                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary mb-2">
+                                        {m.name.charAt(0).toUpperCase()}
                                     </div>
+                                    <div className="text-xs font-medium text-center truncate w-full">{m.name}</div>
+                                    <div className="text-[10px] text-muted-foreground capitalize">{m.role}</div>
                                     {isAdmin && m.role !== 'admin' && (
                                         <Button
                                             size="icon"
                                             variant="ghost"
-                                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                            className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive hover:bg-destructive/10 transition-opacity"
                                             onClick={() => setMemberToRemove(m.id)}
                                             title="Remove Member"
                                         >
-                                            <Trash2 size={16} />
+                                            <Trash2 size={12} />
                                         </Button>
                                     )}
                                 </div>
                             ))}
-                        </CardContent>
-                    </Card>
+                        </div>
+                    </div>
                 </div>
 
                 <div className="md:col-span-2 space-y-4">
@@ -490,8 +522,42 @@ export const TeamDetailsPage: React.FC = () => {
                                             })}>
                                                 {task.priority}
                                             </div>
+                                            {/* Progress Badge */}
+                                            {task.percentComplete !== undefined && task.percentComplete > 0 && (
+                                                <div className="text-[10px] px-1.5 py-0.5 rounded border bg-primary/10 text-primary font-medium">
+                                                    {task.percentComplete}% done
+                                                </div>
+                                            )}
                                         </div>
+                                        {/* Progress Bar */}
+                                        {task.percentComplete !== undefined && task.percentComplete > 0 && (
+                                            <div className="w-full bg-muted rounded-full h-1.5 mt-2">
+                                                <div
+                                                    className="bg-primary h-1.5 rounded-full transition-all"
+                                                    style={{ width: `${task.percentComplete}%` }}
+                                                />
+                                            </div>
+                                        )}
                                         <p className="text-sm text-muted-foreground">{task.description}</p>
+
+                                        {/* Updates Timeline */}
+                                        {task.updates && task.updates.length > 0 && (
+                                            <div className="mt-2 pt-2 border-t border-dashed space-y-2">
+                                                <div className="text-xs font-medium text-muted-foreground">Recent Updates:</div>
+                                                {task.updates.slice(-2).reverse().map((upd) => (
+                                                    <div key={upd.id} className="text-xs bg-muted/50 p-2 rounded space-y-1">
+                                                        <div className="flex justify-between">
+                                                            <span className="font-medium text-primary">{upd.percentComplete}% complete</span>
+                                                            <span className="text-muted-foreground">{format(parseISO(upd.createdAt), 'MMM d, h:mm a')}</span>
+                                                        </div>
+                                                        {upd.workSummary && <div><strong>Work:</strong> {upd.workSummary}</div>}
+                                                        {upd.problemsFaced && <div className="text-amber-600"><strong>Issues:</strong> {upd.problemsFaced}</div>}
+                                                        {upd.resourcesNeeded && <div className="text-blue-600"><strong>Needs:</strong> {upd.resourcesNeeded}</div>}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+
                                         <div className="flex items-center gap-4 text-xs text-muted-foreground pt-1">
                                             <div className="flex items-center gap-1">
                                                 <span>Assigned to:</span>
@@ -554,6 +620,32 @@ export const TeamDetailsPage: React.FC = () => {
                                                 <CheckCircle2 size={14} />
                                                 Done
                                             </Button>
+                                        )}
+                                        {task.status !== 'done' && isMyTask && (
+                                            <TaskProgressUpdate
+                                                taskId={task.id}
+                                                currentPercent={task.percentComplete || 0}
+                                                onSubmit={async (update) => {
+                                                    const taskDoc = await db.tasks.findOne(task.id).exec();
+                                                    if (!taskDoc) return;
+                                                    const newUpdate: TaskUpdate = {
+                                                        id: crypto.randomUUID(),
+                                                        authorId: user!.id,
+                                                        percentComplete: update.percentComplete,
+                                                        workSummary: update.workSummary || undefined,
+                                                        problemsFaced: update.problemsFaced || undefined,
+                                                        resourcesNeeded: update.resourcesNeeded || undefined,
+                                                        createdAt: new Date().toISOString()
+                                                    };
+                                                    await taskDoc.update({
+                                                        $set: {
+                                                            updates: [...(taskDoc.updates || []), newUpdate],
+                                                            percentComplete: update.percentComplete,
+                                                            updatedAt: new Date().toISOString()
+                                                        }
+                                                    });
+                                                }}
+                                            />
                                         )}
                                         {isAdmin && task.status !== 'done' && (
                                             <Button

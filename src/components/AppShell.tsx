@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, LogOut, User, Bell, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Users, LogOut, User, Bell, Menu, X, Sun, Moon, BellRing } from 'lucide-react';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { useDeadlineChecker } from '../hooks/useDeadlineChecker';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { getDatabase } from '../db/database';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 import { SyncStatus } from './SyncStatus';
 import { useToast } from '../context/ToastContext';
+import { requestPushPermission, getNotificationPreference, setNotificationPreference } from '../lib/pushNotifications';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -27,6 +30,11 @@ export const AppShell: React.FC = () => {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     const { showToast } = useToast();
+    const { theme, toggleTheme } = useTheme();
+    const [pushEnabled, setPushEnabled] = useState(getNotificationPreference());
+
+    // Start deadline checker
+    useDeadlineChecker();
 
     // Close mobile menu on navigation
     useEffect(() => {
@@ -127,6 +135,51 @@ export const AppShell: React.FC = () => {
                 </nav>
 
                 <div className="p-4 border-t border-border/40 space-y-4 bg-card/50">
+                    {/* Theme Toggle */}
+                    <Button
+                        variant="ghost"
+                        className="w-full justify-start px-2 hover:bg-muted"
+                        onClick={toggleTheme}
+                    >
+                        <div className="flex items-center gap-2">
+                            {theme === 'dark' ? (
+                                <Sun size={18} className="text-yellow-500" />
+                            ) : (
+                                <Moon size={18} className="text-slate-600" />
+                            )}
+                            <span className="text-sm font-medium">
+                                {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+                            </span>
+                        </div>
+                    </Button>
+                    {/* Push Notification Toggle */}
+                    <Button
+                        variant="ghost"
+                        className="w-full justify-start px-2 hover:bg-muted"
+                        onClick={async () => {
+                            if (!pushEnabled) {
+                                const permission = await requestPushPermission();
+                                if (permission === 'granted') {
+                                    setNotificationPreference(true);
+                                    setPushEnabled(true);
+                                    showToast('success', 'Push notifications enabled!');
+                                } else if (permission === 'denied') {
+                                    showToast('error', 'Notification permission denied. Enable in browser settings.');
+                                }
+                            } else {
+                                setNotificationPreference(false);
+                                setPushEnabled(false);
+                                showToast('info', 'Push notifications disabled');
+                            }
+                        }}
+                    >
+                        <div className="flex items-center gap-2">
+                            <BellRing size={18} className={pushEnabled ? 'text-primary' : 'text-muted-foreground'} />
+                            <span className="text-sm font-medium">
+                                {pushEnabled ? 'Notifications On' : 'Notifications Off'}
+                            </span>
+                        </div>
+                    </Button>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className="w-full justify-start px-2 hover:bg-muted">
