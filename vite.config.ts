@@ -41,8 +41,40 @@ export default defineConfig({
         clientsClaim: true,
         skipWaiting: true,
         cleanupOutdatedCaches: true,
+        // Explicitly include HTML files in precache
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // Ensure index.html is always cached first
+        navigateFallback: 'index.html',
+        // Don't use navigateFallbackDenylist so all navigation goes through SW
+        navigateFallbackAllowlist: [/^\//, /^\/app/],
         runtimeCaching: [
+          // CacheFirst for navigation requests (HTML)
+          {
+            urlPattern: ({ request }) => request.mode === 'navigate',
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'navigation-cache',
+              expiration: {
+                maxEntries: 10,
+                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
+          // CacheFirst for all local assets
+          {
+            urlPattern: /^https?:\/\/localhost.*\.(js|css|png|svg|ico|woff2)$/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'local-assets-cache',
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+              }
+            }
+          },
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: 'CacheFirst',
@@ -50,7 +82,7 @@ export default defineConfig({
               cacheName: 'google-fonts-cache',
               expiration: {
                 maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 365 // <== 365 days
+                maxAgeSeconds: 60 * 60 * 24 * 365 // 365 days
               },
               cacheableResponse: {
                 statuses: [0, 200]
@@ -64,7 +96,7 @@ export default defineConfig({
               cacheName: 'gstatic-fonts-cache',
               expiration: {
                 maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 365 // <== 365 days
+                maxAgeSeconds: 60 * 60 * 24 * 365 // 365 days
               },
               cacheableResponse: {
                 statuses: [0, 200]

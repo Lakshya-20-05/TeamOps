@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useDatabase } from './useDatabase';
 import { useAuth } from '../context/AuthContext';
 import type { Task } from '../db/schemas';
@@ -7,10 +7,33 @@ import { showPushNotification, getPushPermission, getNotificationPreference } fr
 
 const CHECK_INTERVAL_MS = 60 * 1000; // Check every minute
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+const STORAGE_KEY = 'teamops_notified_tasks';
 
 interface NotifiedTasks {
-    overdue: Set<string>;
-    upcoming: Set<string>;
+    overdue: string[];
+    upcoming: string[];
+}
+
+// Load notified tasks from localStorage
+function loadNotifiedTasks(): NotifiedTasks {
+    try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+            return JSON.parse(stored);
+        }
+    } catch (e) {
+        console.error('Failed to load notified tasks', e);
+    }
+    return { overdue: [], upcoming: [] };
+}
+
+// Save notified tasks to localStorage
+function saveNotifiedTasks(notified: NotifiedTasks): void {
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(notified));
+    } catch (e) {
+        console.error('Failed to save notified tasks', e);
+    }
 }
 
 /**
@@ -18,20 +41,25 @@ interface NotifiedTasks {
  * Creates in-app notifications and push notifications for:
  * - Overdue tasks (deadline has passed)
  * - Upcoming deadlines (within 24 hours)
+ * 
+ * Uses localStorage to persist which tasks have been notified
+ * so notifications don't repeat on page reload.
  */
 export function useDeadlineChecker(): void {
     const db = useDatabase();
     const { user } = useAuth();
-    const notifiedRef = useRef<NotifiedTasks>({
-        overdue: new Set(),
-        upcoming: new Set()
-    });
 
     useEffect(() => {
         if (!db || !user) return;
 
         const checkDeadlines = async () => {
             try {
+                // Load already notified tasks from localStorage
+                const notified = loadNotifiedTasks();
+                const overdueSet = new Set(notified.overdue);
+                const upcomingSet = new Set(notified.upcoming);
+                let hasChanges = false;
+
                 // Get all tasks assigned to current user that are not done
                 const tasks = await db.tasks
                     .find({
@@ -43,7 +71,6 @@ export function useDeadlineChecker(): void {
                     .exec();
 
                 const now = new Date();
-                const notified = notifiedRef.current;
 
                 for (const taskDoc of tasks) {
                     const task = taskDoc.toJSON() as Task;
@@ -54,8 +81,9 @@ export function useDeadlineChecker(): void {
                     const taskId = task.id;
 
                     // Check for overdue
-                    if (timeUntilDeadline < 0 && !notified.overdue.has(taskId)) {
-                        notified.overdue.add(taskId);
+                    if (timeUntilDeadline < 0 && !overdueSet.has(taskId)) {
+                        overdueSet.add(taskId);
+                        hasChanges = true;
 
                         // Create in-app notification
                         await db.notifications.insert({
@@ -85,10 +113,11 @@ export function useDeadlineChecker(): void {
                     else if (
                         timeUntilDeadline > 0 &&
                         timeUntilDeadline < TWENTY_FOUR_HOURS_MS &&
-                        !notified.upcoming.has(taskId) &&
-                        !notified.overdue.has(taskId)
+                        !upcomingSet.has(taskId) &&
+                        !overdueSet.has(taskId)
                     ) {
-                        notified.upcoming.add(taskId);
+                        upcomingSet.add(taskId);
+                        hasChanges = true;
 
                         // Create in-app notification
                         await db.notifications.insert({
@@ -113,6 +142,14 @@ export function useDeadlineChecker(): void {
                             });
                         }
                     }
+                }
+
+                // Save updated notified tasks to localStorage
+                if (hasChanges) {
+                    saveNotifiedTasks({
+                        overdue: Array.from(overdueSet),
+                        upcoming: Array.from(upcomingSet)
+                    });
                 }
             } catch (error) {
                 console.error('Deadline checker error:', error);

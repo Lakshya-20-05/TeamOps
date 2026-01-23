@@ -190,5 +190,20 @@ export const syncCollection = async (
         window.dispatchEvent(new CustomEvent('sync-error', { detail: { table: tableName, error: err } }));
     });
 
+    // POLLING FALLBACK: Force resync every 30 seconds when online
+    // This ensures updates are visible even if Realtime fails
+    const pollInterval = setInterval(() => {
+        if (navigator.onLine && !replicationState.isStopped()) {
+            replicationState.reSync();
+        }
+    }, 30 * 1000); // 30 seconds
+
+    // Clean up polling on cancel
+    const finalCancel = replicationState.cancel.bind(replicationState);
+    replicationState.cancel = async () => {
+        clearInterval(pollInterval);
+        return finalCancel();
+    };
+
     return replicationState;
 };
