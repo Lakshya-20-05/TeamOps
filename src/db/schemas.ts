@@ -92,6 +92,7 @@ export interface Invitation {
     receiverId: string;
     status: 'pending' | 'accepted' | 'rejected';
     createdAt: string;
+    updatedAt?: string;
 }
 
 /* --- Schemas --- */
@@ -336,7 +337,7 @@ export const activitySchema: RxJsonSchema<Activity> = {
 };
 
 export const invitationSchema: RxJsonSchema<Invitation> = {
-    version: 0,
+    version: 1, // Bumped to v1 for updatedAt field
     primaryKey: 'id',
     type: 'object',
     properties: {
@@ -358,6 +359,10 @@ export const invitationSchema: RxJsonSchema<Invitation> = {
             enum: ['pending', 'accepted', 'rejected']
         },
         createdAt: {
+            type: 'string',
+            format: 'date-time'
+        },
+        updatedAt: {
             type: 'string',
             format: 'date-time'
         }

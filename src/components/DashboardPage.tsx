@@ -75,17 +75,14 @@ export const DashboardPage: React.FC = () => {
             });
         });
 
-        // Admin: Get pending invitations for teams I admin
+        // Get pending invitations RECEIVED BY the current user
         const sub3 = db.invitations.find({
-            selector: { status: 'pending' }
+            selector: {
+                receiverId: user.id,
+                status: 'pending'
+            }
         }).$.subscribe(invites => {
-            db.teams.find().exec().then(allTeams => {
-                const adminTeamIds = allTeams
-                    .filter(t => t.members.some((m: any) => m.userId === user.id && m.role === 'admin'))
-                    .map(t => t.id);
-                const relevantInvites = invites.filter(i => adminTeamIds.includes(i.teamId));
-                setPendingInvites(relevantInvites.map(i => i.toJSON() as Invitation));
-            });
+            setPendingInvites(invites.map(i => i.toJSON() as Invitation));
         });
 
         return () => {
@@ -196,40 +193,38 @@ export const DashboardPage: React.FC = () => {
                     </CardContent>
                 </Card>
 
-                {/* Admin Only: Pending Invitations */}
-                {isAdmin && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base flex items-center gap-2">
-                                <UserPlus className="h-4 w-4" />
-                                Pending Invitations
-                                {pendingInvites.length > 0 && (
-                                    <span className="ml-auto bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full">
-                                        {pendingInvites.length}
-                                    </span>
-                                )}
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            {pendingInvites.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">No pending invitations</p>
-                            ) : (
-                                <div className="space-y-2">
-                                    <p className="text-sm text-muted-foreground">
-                                        {pendingInvites.length} invitation(s) awaiting response
-                                    </p>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => navigate('/app/notifications')}
-                                    >
-                                        View All
-                                    </Button>
-                                </div>
+                {/* Pending Invitations received by the current user */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base flex items-center gap-2">
+                            <UserPlus className="h-4 w-4" />
+                            Pending Invitations
+                            {pendingInvites.length > 0 && (
+                                <span className="ml-auto bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full">
+                                    {pendingInvites.length}
+                                </span>
                             )}
-                        </CardContent>
-                    </Card>
-                )}
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {pendingInvites.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">No pending invitations</p>
+                        ) : (
+                            <div className="space-y-2">
+                                <p className="text-sm text-muted-foreground">
+                                    {pendingInvites.length} invitation(s) awaiting response
+                                </p>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => navigate('/app/notifications?tab=invitations')}
+                                >
+                                    View All
+                                </Button>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
 
                 {/* Admin Only: Teams I Manage */}
                 {isAdmin && adminTeams.length > 0 && (

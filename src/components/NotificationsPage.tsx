@@ -116,7 +116,10 @@ export function NotificationsPage() {
                 const inviteDoc = await db.invitations.findOne(invite.id).exec();
                 if (inviteDoc) {
                     await inviteDoc.update({
-                        $set: { status: 'accepted' }
+                        $set: {
+                            status: 'accepted',
+                            updatedAt: new Date().toISOString()
+                        }
                     });
                 }
 
@@ -147,7 +150,10 @@ export function NotificationsPage() {
             const inviteDoc = await db.invitations.findOne(inviteId).exec();
             if (inviteDoc) {
                 await inviteDoc.update({
-                    $set: { status: 'rejected' }
+                    $set: {
+                        status: 'rejected',
+                        updatedAt: new Date().toISOString()
+                    }
                 });
 
                 // Notify sender

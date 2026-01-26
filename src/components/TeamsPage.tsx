@@ -120,7 +120,8 @@ export const TeamsPage: React.FC = () => {
                 senderId: user.id, // Use the current authenticated user's ID
                 receiverId: targetUser.id,
                 status: 'pending',
-                createdAt: new Date().toISOString()
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
             });
 
             setInviteStatus('Invitation sent successfully!');

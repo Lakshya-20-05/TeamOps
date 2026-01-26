@@ -142,7 +142,14 @@ const _create = async (): Promise<MyDatabase> => {
                 schema: activitySchema
             },
             invitations: {
-                schema: invitationSchema
+                schema: invitationSchema,
+                migrationStrategies: {
+                    1: function (oldDoc: any) {
+                        // v1: Added updatedAt for sync support
+                        oldDoc.updatedAt = oldDoc.createdAt;
+                        return oldDoc;
+                    }
+                }
             },
             notifications: {
                 schema: notificationSchema,

@@ -62,7 +62,8 @@ export const TeamDetailsPage: React.FC = () => {
                 senderId: user.id,
                 receiverId: targetUser.id,
                 status: 'pending',
-                createdAt: new Date().toISOString()
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
             });
 
             setInviteStatus('Invitation sent successfully!');

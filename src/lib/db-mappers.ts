@@ -92,6 +92,7 @@ export const mapInvitationToRemote = (inv: any) => ({
     receiver_id: inv.receiverId,
     status: inv.status,
     created_at: inv.createdAt,
+    updated_at: inv.updatedAt,
     deleted: !!inv._deleted
 });
 
@@ -102,6 +103,7 @@ export const mapInvitationToLocal = (row: any): Invitation & { _deleted?: boolea
     receiverId: row.receiver_id,
     status: row.status,
     createdAt: row.created_at,
+    updatedAt: row.updated_at || row.created_at,
     _deleted: row.deleted
 });
 
